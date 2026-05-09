@@ -1,0 +1,55 @@
+CREATE TABLE `brands` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`name` text NOT NULL,
+	`slug` text NOT NULL,
+	`url` text NOT NULL,
+	`device_count` integer DEFAULT 0 NOT NULL,
+	`page_count` integer,
+	`created_at` text NOT NULL
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `brands_slug_unique` ON `brands` (`slug`);--> statement-breakpoint
+CREATE TABLE `models` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`brand_id` integer NOT NULL,
+	`name` text NOT NULL,
+	`slug` text NOT NULL,
+	`url` text NOT NULL,
+	`image_url` text,
+	`image_local_path` text,
+	`announced` text,
+	`status` text,
+	`dimensions` text,
+	`weight` text,
+	`build` text,
+	`sim` text,
+	`display_type` text,
+	`display_size` text,
+	`display_resolution` text,
+	`display_protection` text,
+	`os` text,
+	`chipset` text,
+	`cpu` text,
+	`gpu` text,
+	`card_slot` text,
+	`internal_memory` text,
+	`main_camera` text,
+	`main_camera_features` text,
+	`main_camera_video` text,
+	`selfie_camera` text,
+	`selfie_features` text,
+	`selfie_video` text,
+	`battery` text,
+	`battery_charging` text,
+	`network_tech` text,
+	`sensors` text,
+	`colors` text,
+	`models_text` text,
+	`price` text,
+	`meta` text,
+	`scraped` integer DEFAULT 0 NOT NULL,
+	`created_at` text NOT NULL,
+	FOREIGN KEY (`brand_id`) REFERENCES `brands`(`id`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `models_slug_unique` ON `models` (`slug`);
