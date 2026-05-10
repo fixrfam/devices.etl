@@ -1,5 +1,6 @@
 import ora from "ora";
 import { env } from "./env";
+import { scrapeDevices } from "./scrapers/device";
 import { scrapeMakers } from "./scrapers/makers";
 import { scrapeModels } from "./scrapers/models";
 
@@ -25,6 +26,12 @@ async function main() {
 		const spinner = ora().start();
 		const count = await scrapeModels(spinner);
 		spinner.succeed(`${count} makers processed for models`);
+	}
+
+	if (step === "all" || step === "scrape") {
+		const spinner = ora("Scraping device specs...").start();
+		const count = await scrapeDevices(spinner);
+		spinner.succeed(`${count} devices scraped`);
 	}
 }
 
