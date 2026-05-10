@@ -28,8 +28,6 @@ export async function scrapeMakers() {
 				)
 			: makers;
 
-	console.log(`Found ${makers.length} makers (filtered to ${filtered.length})`);
-
 	for (const maker of filtered) {
 		const pageUrl = `${env.gsmarenaBaseUrl}/${maker.slug}.php`;
 		await upsertMaker({
