@@ -1,9 +1,10 @@
 import * as cheerio from "cheerio";
+import type { Ora } from "ora";
 import { env } from "../env";
 import { upsertMaker } from "../services/makers";
 import { http } from "../utils/http";
 
-export async function scrapeMakers() {
+export async function scrapeMakers(spinner: Ora) {
 	const { data: html } = await http.get(env.gsmarenaMakersUrl);
 	const $ = cheerio.load(html);
 
@@ -28,15 +29,16 @@ export async function scrapeMakers() {
 				)
 			: makers;
 
-	for (const maker of filtered) {
-		const pageUrl = `${env.gsmarenaBaseUrl}/${maker.slug}.php`;
+	for (const [i, maker] of filtered.entries()) {
+		if (i > 0) spinner.start();
+		spinner.text = maker.name;
 		await upsertMaker({
 			name: maker.name,
 			slug: maker.slug,
-			url: pageUrl,
+			url: `${env.gsmarenaBaseUrl}/${maker.slug}.php`,
 			deviceCount: maker.deviceCount,
 		});
-		console.log(`  ✓ ${maker.name} (${maker.deviceCount} devices)`);
+		spinner.succeed(`${maker.name} (${maker.deviceCount} devices)`);
 	}
 
 	return filtered;

@@ -1,5 +1,7 @@
+import chalk from "chalk";
 import * as cheerio from "cheerio";
 import { eq } from "drizzle-orm";
+import type { Ora } from "ora";
 import { db } from "../db";
 import { makers } from "../db/schema";
 import { env } from "../env";
@@ -70,29 +72,31 @@ async function scrapeMakerPage(
 	return promises.length;
 }
 
-export async function scrapeModels() {
+export async function scrapeModels(spinner: Ora) {
 	const allMakers = await getAllMakers();
 
-	for (const maker of allMakers) {
+	for (const [i, maker] of allMakers.entries()) {
 		if (!maker.slug.match(/-(\d+)$/)) {
-			console.warn(`  ✗ ${maker.name}: could not parse brand ID from slug`);
+			spinner.fail(`${maker.name}: could not parse brand ID from slug`);
 			continue;
 		}
+
+		if (i > 0) spinner.start();
+		spinner.text = maker.name;
 
 		const { data: html } = await http.get(buildPageUrl(maker.slug, 1));
 		const $ = cheerio.load(html);
 		const totalPages = parseTotalPages($);
 
-		console.log(`  ${maker.name} (${totalPages} pages)`);
 		let totalModels = 0;
 
 		totalModels += await scrapeMakerPage(maker.id, maker.slug, 1);
-		console.log(`    page 1/${totalPages} (${totalModels} models)`);
+		spinner.text = `${maker.name}  ${chalk.dim(`page 1/${totalPages} (${totalModels} models)`)}`;
 
 		for (let page = 2; page <= totalPages; page++) {
 			const count = await scrapeMakerPage(maker.id, maker.slug, page);
 			totalModels += count;
-			console.log(`    page ${page}/${totalPages} (${count} models)`);
+			spinner.text = `${maker.name}  ${chalk.dim(`page ${page}/${totalPages} (${count} models)`)}`;
 		}
 
 		await db
@@ -100,6 +104,8 @@ export async function scrapeModels() {
 			.set({ pageCount: totalPages })
 			.where(eq(makers.id, maker.id))
 			.run();
+
+		spinner.succeed(`${maker.name} (${totalPages} pages)`);
 	}
 
 	return allMakers.length;

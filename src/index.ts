@@ -1,3 +1,4 @@
+import ora from "ora";
 import { env } from "./env";
 import { scrapeMakers } from "./scrapers/makers";
 import { scrapeModels } from "./scrapers/models";
@@ -14,19 +15,17 @@ function parseStep(raw: string | undefined): Step | "all" {
 const step = parseStep(env.step);
 
 async function main() {
-	console.log("GSMarena scraper starting");
-
 	if (step === "all" || step === "makers") {
-		console.log("Scraping makers...");
-		await scrapeMakers();
+		const spinner = ora().start();
+		const makers = await scrapeMakers(spinner);
+		spinner.succeed(`${makers.length} makers scraped`);
 	}
 
 	if (step === "all" || step === "models") {
-		console.log("Scraping models...");
-		await scrapeModels();
+		const spinner = ora().start();
+		const count = await scrapeModels(spinner);
+		spinner.succeed(`${count} makers processed for models`);
 	}
-
-	console.log("\nDone");
 }
 
 main().catch(console.error);
