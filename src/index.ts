@@ -16,8 +16,8 @@ const step = parseStep(env.step);
 
 async function main() {
 	if (step === "all" || step === "makers") {
-		const spinner = ora().start();
-		const makers = await scrapeMakers(spinner);
+		const spinner = ora("Scraping makers...").start();
+		const makers = await scrapeMakers();
 		spinner.succeed(`${makers.length} makers scraped`);
 	}
 
