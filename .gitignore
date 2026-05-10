@@ -42,5 +42,8 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Downloaded images
 data/images/
 
+# Page cache
+data/cache/
+
 # Project plan
 PLAN.md

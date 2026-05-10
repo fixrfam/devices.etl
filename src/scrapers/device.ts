@@ -6,7 +6,9 @@ import { db } from "../db";
 import { models } from "../db/schema";
 import { env } from "../env";
 import { getUnscrapedModels } from "../services/models";
-import { http } from "../utils/http";
+import { isBlocked } from "../utils/blocked";
+import { getCached, setCache } from "../utils/cache";
+import { http, isRateLimited } from "../utils/http";
 import { downloadImage } from "../utils/images";
 
 const DATA_SPEC_MAP: Record<string, string> = {
@@ -67,10 +69,24 @@ export async function scrapeDevices(spinner: Ora) {
 	let successCount = 0;
 
 	for (const [_, model] of unscraped.entries()) {
+		if (isRateLimited()) {
+			console.error(
+				`  ${chalk.red("✗")} ${chalk.bold(model.name)}: rate limited, aborting`,
+			);
+			break;
+		}
+
 		try {
 			spinner.text = model.name;
 
-			const { data: html } = await http.get(model.url);
+			const cached = await getCached(model.slug);
+			const html = cached ?? (await http.get(model.url)).data;
+			if (!cached) await setCache(model.slug, html);
+
+			if (isBlocked(html)) {
+				throw new Error("Blocked by GSMarena");
+			}
+
 			const $ = cheerio.load(html);
 			const { name, specs, meta } = extractSpecs($);
 
@@ -79,7 +95,11 @@ export async function scrapeDevices(spinner: Ora) {
 				meta: JSON.stringify(meta),
 			};
 
-			if (env.imagesDir && model.imageUrl) {
+			if (
+				env.imagesDir &&
+				typeof env.imagesDir === "string" &&
+				model.imageUrl
+			) {
 				try {
 					updateData.imageLocalPath = await downloadImage(
 						model.imageUrl,
@@ -106,7 +126,7 @@ export async function scrapeDevices(spinner: Ora) {
 			console.error(
 				`  ${chalk.red("✗")} ${chalk.bold(model.name)}: ${message}`,
 			);
-			if (message.includes("429")) break;
+			if (message.includes("aborting")) break;
 		}
 	}
 
