@@ -9,8 +9,9 @@ export const models = sqliteTable("models", {
 	name: text().notNull(),
 	slug: text().notNull().unique(),
 	url: text().notNull(),
-	imageUrl: text("image_url"),
-	imageLocalPath: text("image_local_path"),
+  imageUrl: text("image_url"),
+  imageLocalPath: text("image_local_path"),
+  category: text(),
 
 	announced: text(),
 	status: text(),

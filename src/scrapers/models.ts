@@ -5,6 +5,7 @@ import { makers } from "../db/schema";
 import { env } from "../env";
 import { getAllMakers } from "../services/makers";
 import { upsertModel } from "../services/models";
+import { inferModelCategory } from "../utils/category";
 import { http } from "../utils/http";
 
 function buildPageUrl(makerSlug: string, page: number): string {
@@ -46,10 +47,12 @@ async function scrapeMakerPage(
 		const href = $(el).attr("href");
 		const name = $(el).find("strong span").text().trim();
 		const imageUrl = $(el).find("img").attr("src");
+		const title = $(el).find("img").attr("title") ?? "";
 
 		if (!href || !name) return;
 
 		const slug = href.replace(/\.php$/, "");
+		const category = inferModelCategory(title);
 
 		promises.push(
 			upsertModel({
@@ -58,6 +61,7 @@ async function scrapeMakerPage(
 				slug,
 				url: `${env.gsmarenaBaseUrl}/${href}`,
 				imageUrl: imageUrl ?? null,
+				category,
 			}),
 		);
 	});
