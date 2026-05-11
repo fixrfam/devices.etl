@@ -71,10 +71,9 @@ export async function scrapeDevices(spinner: Ora) {
 
 	for (const [_, model] of unscraped.entries()) {
 		if (isRateLimited()) {
-			console.error(
-				`  ${chalk.red("✗")} ${chalk.bold(model.name)}: rate limited, aborting`,
+			throw new Error(
+				`${chalk.red("✗")} ${chalk.bold(model.name)}: rate limited, aborting`,
 			);
-			break;
 		}
 
 		try {
@@ -128,7 +127,7 @@ export async function scrapeDevices(spinner: Ora) {
 			console.error(
 				`  ${chalk.red("✗")} ${chalk.bold(model.name)}: ${message}`,
 			);
-			if (message.includes("aborting")) break;
+			if (message.includes("aborting")) throw err;
 		}
 	}
 
