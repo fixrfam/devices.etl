@@ -26,6 +26,7 @@
     "cheerio": "^1.2.0",
     "date-fns": "^4.1.0",
     "drizzle-orm": "^0.45.2",
+    "https-proxy-agent": "^9.0.0",
     "ora": "^9.4.0"
   }
 }

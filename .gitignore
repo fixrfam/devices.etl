@@ -45,5 +45,8 @@ data/images/
 # Page cache
 data/cache/
 
+# Proxies
+data/proxies/
+
 # Project plan
 PLAN.md

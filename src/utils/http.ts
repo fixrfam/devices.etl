@@ -2,7 +2,16 @@ import http from "node:http";
 import https from "node:https";
 import type { AxiosRequestConfig } from "axios";
 import axios from "axios";
+import chalk from "chalk";
+import { HttpsProxyAgent } from "https-proxy-agent";
 import { env } from "../env";
+import {
+	getProxyCount,
+	getRandomProxy,
+	loadProxies,
+	type ProxyConfig,
+	proxyUrl,
+} from "./proxy";
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -12,6 +21,22 @@ const nodeHttpsAgent = new https.Agent({ keepAlive: true });
 let consecutive429s = 0;
 export function isRateLimited(): boolean {
 	return consecutive429s >= 3;
+}
+
+let lastProxy: ProxyConfig | undefined;
+
+export function getLastProxy(): ProxyConfig | undefined {
+	return lastProxy;
+}
+
+const proxyAgentCache = new Map<string, HttpsProxyAgent<string>>();
+
+loadProxies(env.proxyFilePath);
+const proxyCount = getProxyCount();
+if (proxyCount > 0) {
+	console.log(`Loaded ${proxyCount} proxies from ${env.proxyFilePath}`);
+} else {
+	console.log(`  ${chalk.dim("─")} No proxies loaded, running without proxy`);
 }
 
 const client = axios.create({
@@ -25,8 +50,6 @@ const client = axios.create({
 		Connection: "keep-alive",
 		"Cache-Control": "max-age=0",
 	},
-	httpAgent: nodeHttpAgent,
-	httpsAgent: nodeHttpsAgent,
 	timeout: 15_000,
 });
 
@@ -35,10 +58,24 @@ let firstRequest = true;
 client.interceptors.request.use(async (config) => {
 	if (firstRequest) {
 		firstRequest = false;
-		return config;
+	} else {
+		const jitter = env.requestDelayMs * (0.5 + Math.random() * 0.5);
+		await delay(jitter);
 	}
-	const jitter = env.requestDelayMs * (0.5 + Math.random() * 0.5);
-	await delay(jitter);
+
+	const proxy = getRandomProxy();
+	if (proxy) {
+		lastProxy = proxy;
+		const url = proxyUrl(proxy);
+		if (!proxyAgentCache.has(url)) {
+			proxyAgentCache.set(url, new HttpsProxyAgent(url));
+		}
+		config.httpsAgent = proxyAgentCache.get(url);
+	} else {
+		config.httpAgent = nodeHttpAgent;
+		config.httpsAgent = nodeHttpsAgent;
+	}
+
 	return config;
 });
 

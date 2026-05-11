@@ -9,7 +9,7 @@ import { getUnscrapedModels } from "../services/models";
 import { applyTransforms } from "../transforms";
 import { isBlocked } from "../utils/blocked";
 import { getCached, setCache } from "../utils/cache";
-import { http, isRateLimited } from "../utils/http";
+import { getLastProxy, http, isRateLimited } from "../utils/http";
 import { downloadImage } from "../utils/images";
 
 const DATA_SPEC_MAP: Record<string, string> = {
@@ -124,8 +124,12 @@ export async function scrapeDevices(spinner: Ora) {
 			successCount++;
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
+			const proxy = getLastProxy();
+			const proxyInfo = proxy
+				? chalk.dim(` [proxy: ${proxy.host}:${proxy.port}]`)
+				: "";
 			console.error(
-				`  ${chalk.red("✗")} ${chalk.bold(model.name)}: ${message}`,
+				`  ${chalk.red("✗")} ${chalk.bold(model.name)}: ${message}${proxyInfo}`,
 			);
 			if (message.includes("aborting")) throw err;
 		}

@@ -14,4 +14,5 @@ export const env = {
 		process.env.MAKERS_TO_SCRAPE?.split(",").filter(Boolean) ?? [],
 	imagesDir: process.env.IMAGES_DIR,
 	step: process.env.STEP,
+	proxyFilePath: process.env.PROXY_FILE_PATH,
 } as const;
