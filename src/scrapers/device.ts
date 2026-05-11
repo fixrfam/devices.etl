@@ -6,6 +6,7 @@ import { db } from "../db";
 import { models } from "../db/schema";
 import { env } from "../env";
 import { getUnscrapedModels } from "../services/models";
+import { applyTransforms } from "../transforms";
 import { isBlocked } from "../utils/blocked";
 import { getCached, setCache } from "../utils/cache";
 import { http, isRateLimited } from "../utils/http";
@@ -89,9 +90,10 @@ export async function scrapeDevices(spinner: Ora) {
 
 			const $ = cheerio.load(html);
 			const { name, specs, meta } = extractSpecs($);
+			const transformed = applyTransforms(specs);
 
 			const updateData: Record<string, unknown> = {
-				...specs,
+				...transformed,
 				meta: JSON.stringify(meta),
 			};
 

@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { makers } from "./makers";
 
 export const models = sqliteTable("models", {
@@ -9,9 +9,9 @@ export const models = sqliteTable("models", {
 	name: text().notNull(),
 	slug: text().notNull().unique(),
 	url: text().notNull(),
-  imageUrl: text("image_url"),
-  imageLocalPath: text("image_local_path"),
-  category: text(),
+	imageUrl: text("image_url"),
+	imageLocalPath: text("image_local_path"),
+	category: text(),
 
 	announced: text(),
 	status: text(),
@@ -40,8 +40,19 @@ export const models = sqliteTable("models", {
 	networkTech: text("network_tech"),
 	sensors: text(),
 	colors: text(),
+	colorsHex: text("colors_hex"),
 	modelsText: text("models_text"),
 	price: text(),
+	dimensionsWidth: real("dimensions_width"),
+	dimensionsHeight: real("dimensions_height"),
+	dimensionsThickness: real("dimensions_thickness"),
+	weightGrams: real("weight_grams"),
+	displaySizeInches: real("display_size_inches"),
+	displaySizeRatio: text("display_size_ratio"),
+	displayResWidth: integer("display_res_width"),
+	displayResHeight: integer("display_res_height"),
+	displayResPpi: integer("display_res_ppi"),
+	released: text(),
 
 	meta: text(),
 
