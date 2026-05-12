@@ -1,8 +1,6 @@
 import ora from "ora";
 import { env } from "./env";
-import { scrapeDevices } from "./scrapers/device";
-import { scrapeMakers } from "./scrapers/makers";
-import { scrapeModels } from "./scrapers/models";
+import { scrapeDevices, scrapeMakers, scrapeModels } from "./scrapers";
 
 const STEPS = ["makers", "models", "scrape"] as const;
 type Step = (typeof STEPS)[number];
@@ -18,7 +16,7 @@ const step = parseStep(env.step);
 async function main() {
 	if (step === "all" || step === "makers") {
 		const spinner = ora("Scraping makers...").start();
-		const makers = await scrapeMakers();
+		const makers: Array<unknown> = await scrapeMakers();
 		spinner.succeed(`${makers.length} makers scraped`);
 	}
 

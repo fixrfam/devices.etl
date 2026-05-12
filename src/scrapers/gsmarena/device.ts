@@ -2,15 +2,15 @@ import chalk from "chalk";
 import * as cheerio from "cheerio";
 import { eq } from "drizzle-orm";
 import type { Ora } from "ora";
-import { db } from "../db";
-import { models } from "../db/schema";
-import { env } from "../env";
-import { getUnscrapedModels } from "../services/models";
-import { applyTransforms } from "../transforms";
-import { isBlocked } from "../utils/blocked";
-import { getCached, setCache } from "../utils/cache";
-import { getLastProxy, http, isRateLimited } from "../utils/http";
-import { downloadImage } from "../utils/images";
+import { db } from "../../db";
+import { models } from "../../db/schema";
+import { env } from "../../env";
+import { getUnscrapedModels } from "../../services/models";
+import { applyTransforms } from "../../transforms";
+import { isBlocked } from "../../utils/blocked";
+import { getCached, setCache } from "../../utils/cache";
+import { getLastProxy, http, isRateLimited } from "../../utils/http";
+import { downloadImage } from "../../utils/images";
 
 const DATA_SPEC_MAP: Record<string, string> = {
 	nettech: "networkTech",

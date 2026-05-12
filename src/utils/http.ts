@@ -31,12 +31,14 @@ export function getLastProxy(): ProxyConfig | undefined {
 
 const proxyAgentCache = new Map<string, HttpsProxyAgent<string>>();
 
-loadProxies(env.proxyFilePath);
-const proxyCount = getProxyCount();
-if (proxyCount > 0) {
-	console.log(`Loaded ${proxyCount} proxies from ${env.proxyFilePath}`);
-} else {
-	console.log(`  ${chalk.dim("─")} No proxies loaded, running without proxy`);
+if (env.proxyFilePath) {
+	loadProxies(env.proxyFilePath);
+	const proxyCount = getProxyCount();
+	if (proxyCount > 0) {
+		console.log(`Loaded ${proxyCount} proxies from ${env.proxyFilePath}`);
+	} else {
+		console.log(`  ${chalk.dim("─")} No proxies loaded, running without proxy`);
+	}
 }
 
 const client = axios.create({
@@ -46,7 +48,6 @@ const client = axios.create({
 		Accept:
 			"text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
 		"Accept-Language": "en-US,en;q=0.9",
-		Referer: env.gsmarenaBaseUrl,
 		Connection: "keep-alive",
 		"Cache-Control": "max-age=0",
 	},
@@ -61,6 +62,13 @@ client.interceptors.request.use(async (config) => {
 	} else {
 		const jitter = env.requestDelayMs * (0.5 + Math.random() * 0.5);
 		await delay(jitter);
+	}
+
+	if (config.url) {
+		try {
+			const origin = new URL(config.url, config.baseURL).origin;
+			config.headers.set("Referer", origin + "/");
+		} catch {}
 	}
 
 	const proxy = getRandomProxy();

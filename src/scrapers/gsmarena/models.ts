@@ -2,13 +2,13 @@ import chalk from "chalk";
 import * as cheerio from "cheerio";
 import { eq } from "drizzle-orm";
 import type { Ora } from "ora";
-import { db } from "../db";
-import { makers } from "../db/schema";
-import { env } from "../env";
-import { getAllMakers } from "../services/makers";
-import { upsertModel } from "../services/models";
-import { inferModelCategory } from "../utils/category";
-import { http } from "../utils/http";
+import { db } from "../../db";
+import { makers } from "../../db/schema";
+import { env } from "../../env";
+import { getAllMakers } from "../../services/makers";
+import { upsertModel } from "../../services/models";
+import { inferModelCategory } from "../../utils/category";
+import { http } from "../../utils/http";
 
 function buildPageUrl(makerSlug: string, page: number): string {
 	if (page === 1) {
