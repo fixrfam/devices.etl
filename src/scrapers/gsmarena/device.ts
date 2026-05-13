@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import type { Ora } from "ora";
 import { db } from "../../db";
 import { models } from "../../db/schema";
+import type { ModelSelect } from "../../db/schema/models";
 import { env } from "../../env";
 import { getUnscrapedModels } from "../../services/models";
 import { applyTransforms } from "../../transforms";
@@ -12,6 +13,7 @@ import { getCached, setCache } from "../../utils/cache";
 import { getLastProxy, http, isRateLimited } from "../../utils/http";
 import { downloadImage } from "../../utils/images";
 
+/** Maps GSMarena `data-spec` attribute values to DB column names */
 const DATA_SPEC_MAP: Record<string, string> = {
 	nettech: "networkTech",
 	dimensions: "dimensions",
@@ -43,6 +45,7 @@ const DATA_SPEC_MAP: Record<string, string> = {
 	status: "status",
 };
 
+/** Extract known specs + unknown meta from a device page */
 function extractSpecs($: cheerio.CheerioAPI) {
 	const name = $("h1.specs-phone-name-title").text().trim();
 	const specs: Record<string, string> = {};
@@ -65,71 +68,67 @@ function extractSpecs($: cheerio.CheerioAPI) {
 	return { name, specs, meta };
 }
 
+/** Format a proxy note for error messages */
+function proxyNote(): string {
+	const proxy = getLastProxy();
+	return proxy ? chalk.dim(` [proxy: ${proxy.host}:${proxy.port}]`) : "";
+}
+
+/** Scrape specs for a single device: fetch / parse / transform / save */
+async function scrapeDevice(model: ModelSelect): Promise<boolean> {
+	const cached = await getCached(model.slug);
+	const html = cached ?? (await http.get(model.url)).data;
+	if (!cached) await setCache(model.slug, html);
+
+	if (isBlocked(html)) throw new Error("Blocked by GSMarena");
+
+	const $ = cheerio.load(html);
+	const { name, specs, meta } = extractSpecs($);
+	const transformed = applyTransforms(specs);
+
+	const updateData: Record<string, unknown> = {
+		...transformed,
+		meta: JSON.stringify(meta),
+	};
+
+	/* Download image (non-fatal on failure) */
+	if (env.imagesDir && model.imageUrl) {
+		try {
+			updateData.imageLocalPath = await downloadImage(
+				model.imageUrl,
+				env.imagesDir,
+				model.slug,
+			);
+		} catch {
+			/* image download is best-effort */
+		}
+	}
+
+	updateData.scraped = 1;
+
+	await db.update(models).set(updateData).where(eq(models.id, model.id)).run();
+
+	console.log(`  ${chalk.green("✓")} ${chalk.bold(name)}`);
+	return true;
+}
+
 export async function scrapeDevices(spinner: Ora) {
 	const unscraped = await getUnscrapedModels();
 	let successCount = 0;
 
-	for (const [_, model] of unscraped.entries()) {
+	for (const model of unscraped) {
 		if (isRateLimited()) {
-			throw new Error(
-				`${chalk.red("✗")} ${chalk.bold(model.name)}: rate limited, aborting`,
-			);
+			throw new Error(`${chalk.red("✗")} rate limited, aborting`);
 		}
 
 		try {
 			spinner.text = model.name;
-
-			const cached = await getCached(model.slug);
-			const html = cached ?? (await http.get(model.url)).data;
-			if (!cached) await setCache(model.slug, html);
-
-			if (isBlocked(html)) {
-				throw new Error("Blocked by GSMarena");
-			}
-
-			const $ = cheerio.load(html);
-			const { name, specs, meta } = extractSpecs($);
-			const transformed = applyTransforms(specs);
-
-			const updateData: Record<string, unknown> = {
-				...transformed,
-				meta: JSON.stringify(meta),
-			};
-
-			if (
-				env.imagesDir &&
-				typeof env.imagesDir === "string" &&
-				model.imageUrl
-			) {
-				try {
-					updateData.imageLocalPath = await downloadImage(
-						model.imageUrl,
-						env.imagesDir,
-						model.slug,
-					);
-				} catch {
-					// image download failure is non-fatal
-				}
-			}
-
-			updateData.scraped = 1;
-
-			await db
-				.update(models)
-				.set(updateData)
-				.where(eq(models.id, model.id))
-				.run();
-
-			console.log(`  ${chalk.green("✓")} ${chalk.bold(name)}`);
-			successCount++;
+			const ok = await scrapeDevice(model);
+			if (ok) successCount++;
 		} catch (err) {
 			const message = err instanceof Error ? err.message : String(err);
-			const proxy = getLastProxy();
-			const proxyInfo = proxy
-				? chalk.dim(` [proxy: ${proxy.host}:${proxy.port}]`)
-				: "";
 			console.error(
-				`  ${chalk.red("✗")} ${chalk.bold(model.name)}: ${message}${proxyInfo}`,
+				`  ${chalk.red("✗")} ${chalk.bold(model.name)}: ${message}${proxyNote()}`,
 			);
 			if (message.includes("aborting")) throw err;
 		}

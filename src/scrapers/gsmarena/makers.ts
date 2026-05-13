@@ -4,11 +4,13 @@ import { env } from "../../env";
 import { upsertMaker } from "../../services/makers";
 import { http } from "../../utils/http";
 
-export async function scrapeMakers() {
-	const { data: html } = await http.get(env.gsmarenaMakersUrl);
-	const $ = cheerio.load(html);
-
-	const makers: Array<{ name: string; slug: string; deviceCount: number }> = [];
+/** Parse the GSMarena makers page to brand entries */
+function parseMakers($: cheerio.CheerioAPI) {
+	const makers: Array<{
+		name: string;
+		slug: string;
+		deviceCount: number;
+	}> = [];
 
 	$(".st-text table tr td a").each((_, el) => {
 		const href = $(el).attr("href");
@@ -18,16 +20,33 @@ export async function scrapeMakers() {
 
 		if (!href || !name) return;
 
-		const slug = href.replace(/\.php$/, "");
-		makers.push({ name, slug, deviceCount });
+		makers.push({
+			name,
+			slug: href.replace(/\.php$/, ""),
+			deviceCount,
+		});
 	});
 
-	const filtered =
-		env.makersToScrape.length > 0
-			? makers.filter((b) =>
-					env.makersToScrape.some((p) => new RegExp(p, "i").test(b.name)),
-				)
-			: makers;
+	return makers;
+}
+
+/** Filter makers by user-configured regex patterns */
+function filterMakers(
+	makers: Array<{ name: string; slug: string; deviceCount: number }>,
+) {
+	if (env.makersToScrape.length === 0) return makers;
+
+	return makers.filter((b) =>
+		env.makersToScrape.some((p) => new RegExp(p, "i").test(b.name)),
+	);
+}
+
+export async function scrapeMakers() {
+	const { data: html } = await http.get(env.gsmarenaMakersUrl);
+	const $ = cheerio.load(html);
+
+	const all = parseMakers($);
+	const filtered = filterMakers(all);
 
 	for (const maker of filtered) {
 		await upsertMaker({

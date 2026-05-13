@@ -140,10 +140,7 @@ async function collectRemaining(
 }
 
 /** POST to Elastic App Search with brand filter + pagination */
-async function searchElastic({
-	brand,
-	page,
-}: { brand: string; page: number }) {
+async function searchElastic({ brand, page }: { brand: string; page: number }) {
 	return http.post(
 		SEARCH_ENDPOINT,
 		{
@@ -161,7 +158,7 @@ async function searchElastic({
 	);
 }
 
-/** Parse a search hit → ModelData, dedup by series key (strip trailing `-\d+`) */
+/** Parse a search hit to ModelData, dedup by series key (strip trailing `-\d+`) */
 function toModel(hit: Hit, seen: Set<string>): ModelData | null {
 	const url = hit.url?.raw ?? "";
 	if (!url) return null;

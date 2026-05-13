@@ -10,40 +10,49 @@ import { upsertModel } from "../../services/models";
 import { inferModelCategory } from "../../utils/category";
 import { http } from "../../utils/http";
 
-function buildPageUrl(makerSlug: string, page: number): string {
-	if (page === 1) {
-		return `${env.gsmarenaBaseUrl}/${makerSlug}.php`;
-	}
+/** Build GSMarena brand listing URL for a given page */
+function brandPageUrl(makerSlug: string, page: number): string {
+	if (page === 1) return `${env.gsmarenaBaseUrl}/${makerSlug}.php`;
+
 	const match = makerSlug.match(/^(.*)-(\d+)$/);
 	if (!match) return `${env.gsmarenaBaseUrl}/${makerSlug}.php`;
-	const base = match[1];
-	const id = match[2];
-	return `${env.gsmarenaBaseUrl}/${base}-f-${id}-0-p${page}.php`;
+
+	return `${env.gsmarenaBaseUrl}/${match[1]}-f-${match[2]}-0-p${page}.php`;
 }
 
+/** Extract total page count from pagination nav */
 function parseTotalPages($: cheerio.CheerioAPI): number {
-	let maxPage = 1;
+	let max = 1;
 	$(".nav-pages a").each((_, el) => {
 		const text = $(el).text().trim();
 		if (text === "◄" || text === "►") return;
-		const page = Number.parseInt(text, 10);
-		if (!Number.isNaN(page) && page > maxPage) {
-			maxPage = page;
-		}
+		const n = Number.parseInt(text, 10);
+		if (!Number.isNaN(n) && n > max) max = n;
 	});
-	return maxPage;
+	return max;
 }
 
-async function scrapeMakerPage(
+/** Parse model listings from a brand page HTML */
+function parseModels(
+	html: string,
 	makerId: number,
-	makerSlug: string,
-	page: number,
-) {
-	const url = buildPageUrl(makerSlug, page);
-	const { data: html } = await http.get(url);
+): Array<{
+	makerId: number;
+	name: string;
+	slug: string;
+	url: string;
+	imageUrl: string | null;
+	category: string | null;
+}> {
 	const $ = cheerio.load(html);
-
-	const promises: Array<Promise<unknown>> = [];
+	const models: Array<{
+		makerId: number;
+		name: string;
+		slug: string;
+		url: string;
+		imageUrl: string | null;
+		category: string | null;
+	}> = [];
 
 	$(".makers ul li a").each((_, el) => {
 		const href = $(el).attr("href");
@@ -53,23 +62,30 @@ async function scrapeMakerPage(
 
 		if (!href || !name) return;
 
-		const slug = href.replace(/\.php$/, "");
-		const category = inferModelCategory(title);
-
-		promises.push(
-			upsertModel({
-				makerId,
-				name,
-				slug,
-				url: `${env.gsmarenaBaseUrl}/${href}`,
-				imageUrl: imageUrl ?? null,
-				category,
-			}),
-		);
+		models.push({
+			makerId,
+			name,
+			slug: href.replace(/\.php$/, ""),
+			url: `${env.gsmarenaBaseUrl}/${href}`,
+			imageUrl: imageUrl ?? null,
+			category: inferModelCategory(title),
+		});
 	});
 
-	await Promise.all(promises);
-	return promises.length;
+	return models;
+}
+
+/** Fetch a brand page and upsert all models found */
+async function processBrandPage(
+	makerId: number,
+	makerSlug: string,
+	page: number,
+): Promise<number> {
+	const { data: html } = await http.get(brandPageUrl(makerSlug, page));
+	const models = parseModels(html, makerId);
+
+	await Promise.all(models.map((m) => upsertModel(m)));
+	return models.length;
 }
 
 export async function scrapeModels(spinner: Ora) {
@@ -84,17 +100,15 @@ export async function scrapeModels(spinner: Ora) {
 		if (i > 0) spinner.start();
 		spinner.text = maker.name;
 
-		const { data: html } = await http.get(buildPageUrl(maker.slug, 1));
-		const $ = cheerio.load(html);
-		const totalPages = parseTotalPages($);
-
-		let totalModels = 0;
-
-		totalModels += await scrapeMakerPage(maker.id, maker.slug, 1);
+		/* Fetch page 1 once. Gets totalPages AND models */
+		const { data: html } = await http.get(brandPageUrl(maker.slug, 1));
+		const totalPages = parseTotalPages(cheerio.load(html));
+		let totalModels = await upsertModelsFromHtml(html, maker.id);
 		spinner.text = `${maker.name}  ${chalk.dim(`page 1/${totalPages} (${totalModels} models)`)}`;
 
+		/* Remaining pages */
 		for (let page = 2; page <= totalPages; page++) {
-			const count = await scrapeMakerPage(maker.id, maker.slug, page);
+			const count = await processBrandPage(maker.id, maker.slug, page);
 			totalModels += count;
 			spinner.text = `${maker.name}  ${chalk.dim(`page ${page}/${totalPages} (${count} models)`)}`;
 		}
@@ -109,4 +123,11 @@ export async function scrapeModels(spinner: Ora) {
 	}
 
 	return allMakers.length;
+}
+
+/** Parse + upsert from pre-fetched HTML */
+async function upsertModelsFromHtml(html: string, makerId: number) {
+	const models = parseModels(html, makerId);
+	await Promise.all(models.map((m) => upsertModel(m)));
+	return models.length;
 }
