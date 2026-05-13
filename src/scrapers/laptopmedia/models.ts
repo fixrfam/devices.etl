@@ -69,38 +69,20 @@ export async function scrapeModels(spinner: Ora) {
  */
 async function collectModelsForBrand(maker: { name: string }) {
 	const seen = new Set<string>();
-	const collected: ModelData[] = [];
-
-	let page = 1;
 	let matched = 0;
 	const maxBrand = env.maxPerBrand ?? Infinity;
-	let totalPages = Infinity;
 
-	while (collected.length < maxBrand && page <= totalPages) {
-		const { data } = await searchElastic({ brand: maker.name, page });
-		totalPages = data.meta?.page?.total_pages ?? 0;
+	/* Phase 1: popular-series filter for the first 10 slots */
+	const collected = await fetchPagesForBrand(maker.name, maxBrand, seen, (model) => {
+		const isMatch = POPULAR_SERIES.test(model.name);
+		if (matched < 10 && !isMatch) return false;
+		if (isMatch) matched++;
+		return true;
+	});
 
-		for (const hit of data.results ?? []) {
-			if (collected.length >= maxBrand) break;
-
-			const model = toModel(hit, seen);
-			if (!model) continue;
-
-			const isMatch = POPULAR_SERIES.test(model.name);
-
-			/* Require popular-series match for the first 10 slots */
-			if (matched < 10 && !isMatch) continue;
-
-			if (isMatch) matched++;
-			collected.push(model);
-		}
-
-		page++;
-	}
-
-	/* Fallback: brand is too niche — re-collect without the popular filter */
+	/* Phase 2: fallback — brand is too niche, re-collect without filter */
 	if (matched < 10 && collected.length < maxBrand) {
-		const rest = await collectRemaining(maker.name, maxBrand, seen);
+		const rest = await fetchPagesForBrand(maker.name, maxBrand, seen);
 		collected.push(...rest);
 	}
 
@@ -108,14 +90,17 @@ async function collectModelsForBrand(maker: { name: string }) {
 }
 
 /**
- * Fallback pass: fetches remaining pages without the POPULAR_SERIES filter.
- * Used when a brand has very few popular-series matches (< 10).
+ * Fetch paginated Elastic results for one brand.
+ *
+ * @param filterFn - Optional predicate; returns false to skip a model.
+ *                    Shared `seen` dedup set is applied before the filter.
  */
-async function collectRemaining(
+async function fetchPagesForBrand(
 	brand: string,
 	maxBrand: number,
 	seen: Set<string>,
-) {
+	filterFn?: (model: ModelData) => boolean,
+): Promise<ModelData[]> {
 	const collected: ModelData[] = [];
 	let page = 1;
 	let totalPages = Infinity;
@@ -129,6 +114,7 @@ async function collectRemaining(
 
 			const model = toModel(hit, seen);
 			if (!model) continue;
+			if (filterFn && !filterFn(model)) continue;
 
 			collected.push(model);
 		}

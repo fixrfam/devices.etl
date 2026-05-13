@@ -7,7 +7,11 @@ const SEARCH_ENDPOINT =
 	"https://f9c93ee4270640ecab783317284098e2.ent-search.us-central1.gcp.cloud.es.io/api/as/v1/engines/laptops-usa/search";
 const SEARCH_KEY = "search-rb7yrqtdfv7t5gg4oav9tgtw";
 
-export async function scrapeMakers() {
+type RawBrand = { value: string; count: number };
+type MakerEntry = { name: string; slug: string; url: string; deviceCount: number };
+
+/** Query Elastic API facets to get all brands indexed on the platform */
+async function fetchBrands(): Promise<RawBrand[]> {
 	const { data } = await http.post(
 		SEARCH_ENDPOINT,
 		{
@@ -23,10 +27,21 @@ export async function scrapeMakers() {
 		},
 	);
 
-	const brands: Array<{ value: string; count: number }> =
-		data.facets?.brand?.[0]?.data ?? [];
+	return data.facets?.brand?.[0]?.data ?? [];
+}
 
-	const makers = brands
+/** Convert a brand name to a URL-safe slug */
+function brandToSlug(name: string): string {
+	return name
+		.toLowerCase()
+		.replace(/&/g, "and")
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "");
+}
+
+/** Map raw Elastic brand entries to MakerEntry objects */
+function parseMakers(brands: RawBrand[]): MakerEntry[] {
+	return brands
 		.filter((b) => b.value)
 		.map((b) => ({
 			name: b.value,
@@ -34,13 +49,21 @@ export async function scrapeMakers() {
 			url: `https://laptopmedia.com/manufacturer/${brandToSlug(b.value)}/`,
 			deviceCount: b.count,
 		}));
+}
 
-	const filtered =
-		env.laptopmediaMakersToScrape.length > 0
-			? makers.filter((b) =>
-					env.laptopmediaMakersToScrape.some((p) => new RegExp(p, "i").test(b.name)),
-				)
-			: makers;
+/** Filter makers by user-configured regex patterns */
+function filterMakers(makers: MakerEntry[]): MakerEntry[] {
+	if (env.laptopmediaMakersToScrape.length === 0) return makers;
+
+	return makers.filter((b) =>
+		env.laptopmediaMakersToScrape.some((p) => new RegExp(p, "i").test(b.name)),
+	);
+}
+
+export async function scrapeMakers() {
+	const rawBrands = await fetchBrands();
+	const all = parseMakers(rawBrands);
+	const filtered = filterMakers(all);
 
 	for (const maker of filtered) {
 		await upsertMaker({
@@ -55,12 +78,4 @@ export async function scrapeMakers() {
 	}
 
 	return filtered;
-}
-
-function brandToSlug(name: string): string {
-	return name
-		.toLowerCase()
-		.replace(/&/g, "and")
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "");
 }
