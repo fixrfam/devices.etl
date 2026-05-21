@@ -9,6 +9,7 @@ type SiteModule = {
 const modules: Record<Site, () => Promise<SiteModule>> = {
 	gsmarena: () => import("./gsmarena"),
 	laptopmedia: () => import("./laptopmedia"),
+	displayspecs: () => import("./displayspecs"),
 };
 
 const site: Site = env.site;

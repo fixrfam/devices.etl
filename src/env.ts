@@ -6,16 +6,23 @@ function requireEnv(name: string): string {
 	return value;
 }
 
-export type Site = "gsmarena" | "laptopmedia";
+export type Site = "gsmarena" | "laptopmedia" | "displayspecs";
 
 const rawSite = process.env.SITE;
-const site: Site = rawSite === "laptopmedia" ? "laptopmedia" : "gsmarena";
+const site: Site =
+	rawSite === "laptopmedia"
+		? "laptopmedia"
+		: rawSite === "displayspecs"
+			? "displayspecs"
+			: "gsmarena";
 
 const required: string[] = ["REQUEST_DELAY_MS"];
 if (site === "gsmarena") {
 	required.push("GSMARENA_BASE_URL", "GSMARENA_MAKERS_PAGE_URL");
-} else {
+} else if (site === "laptopmedia") {
 	required.push("LAPTOPMEDIA_BASE_URL");
+} else {
+	required.push("DISPLAYSPECS_BASE_URL");
 }
 for (const name of required) {
 	requireEnv(name);
@@ -35,6 +42,10 @@ export const env = {
 	maxPerBrand: process.env.MAX_PER_BRAND
 		? Number(process.env.MAX_PER_BRAND)
 		: null,
+
+	displayspecsBaseUrl: process.env.DISPLAYSPECS_BASE_URL ?? "",
+	displayspecsMakersToScrape:
+		process.env.DISPLAYSPECS_MAKERS_TO_SCRAPE?.split(",").filter(Boolean) ?? [],
 
 	requestDelayMs: Number(requireEnv("REQUEST_DELAY_MS")),
 	imagesDir: process.env.IMAGES_DIR,
