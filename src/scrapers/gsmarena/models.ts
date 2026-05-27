@@ -7,7 +7,7 @@ import { makers } from "../../db/schema";
 import { env } from "../../env";
 import { getAllMakers } from "../../services/makers";
 import { upsertModel } from "../../services/models";
-import { inferModelCategory } from "../../utils/category";
+import { inferModelCategory, getCategoryId } from "../../utils/category";
 import { http } from "../../utils/http";
 
 /** Build GSMarena brand listing URL for a given page */
@@ -82,10 +82,15 @@ async function processBrandPage(
 	page: number,
 ): Promise<number> {
 	const { data: html } = await http.get(brandPageUrl(makerSlug, page));
-	const models = parseModels(html, makerId);
+	const parsed = parseModels(html, makerId);
 
-	await Promise.all(models.map((m) => upsertModel(m)));
-	return models.length;
+	await Promise.all(
+		parsed.map(async (m) => {
+			const categoryId = m.category ? await getCategoryId(m.category) : null;
+			return upsertModel({ ...m, categoryId });
+		}),
+	);
+	return parsed.length;
 }
 
 export async function scrapeModels(spinner: Ora) {
@@ -127,7 +132,12 @@ export async function scrapeModels(spinner: Ora) {
 
 /** Parse + upsert from pre-fetched HTML */
 async function upsertModelsFromHtml(html: string, makerId: number) {
-	const models = parseModels(html, makerId);
-	await Promise.all(models.map((m) => upsertModel(m)));
-	return models.length;
+	const parsed = parseModels(html, makerId);
+	await Promise.all(
+		parsed.map(async (m) => {
+			const categoryId = m.category ? await getCategoryId(m.category) : null;
+			return upsertModel({ ...m, categoryId });
+		}),
+	);
+	return parsed.length;
 }

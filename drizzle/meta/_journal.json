@@ -22,6 +22,13 @@
       "when": 1778440597259,
       "tag": "0002_nebulous_sasquatch",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1779883056509,
+      "tag": "0003_glamorous_the_call",
+      "breakpoints": true
     }
   ]
 }

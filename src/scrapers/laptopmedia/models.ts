@@ -2,6 +2,7 @@ import type { Ora } from "ora";
 import { env } from "../../env";
 import { getAllMakers } from "../../services/makers";
 import { upsertModel } from "../../services/models";
+import { getCategoryId } from "../../utils/category";
 import { http } from "../../utils/http";
 
 /** Elastic App Search endpoint + public key (embedded in frontend JS) */
@@ -38,6 +39,7 @@ export async function scrapeModels(spinner: Ora) {
 
 		let upserted = 0;
 		for (const m of collected) {
+			const categoryId = await getCategoryId("laptop");
 			await upsertModel({
 				makerId: maker.id,
 				name: m.name,
@@ -45,6 +47,7 @@ export async function scrapeModels(spinner: Ora) {
 				url: m.url,
 				imageUrl: m.imageUrl,
 				category: "laptop",
+				categoryId,
 			});
 			upserted++;
 		}

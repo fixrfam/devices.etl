@@ -3,7 +3,7 @@ import * as cheerio from "cheerio";
 import { eq } from "drizzle-orm";
 import type { Ora } from "ora";
 import { db } from "../../db";
-import { models } from "../../db/schema";
+import { models, modelImages } from "../../db/schema";
 import type { ModelSelect } from "../../db/schema/models";
 import { env } from "../../env";
 import { getUnscrapedModels } from "../../services/models";
@@ -101,6 +101,33 @@ async function scrapeDevice(model: ModelSelect): Promise<boolean> {
 			);
 		} catch {
 			/* image download is best-effort */
+		}
+	}
+
+	/* Insert into model_images */
+	if (model.imageUrl) {
+		try {
+			const ext = new URL(model.imageUrl).pathname.split(".").pop() || "jpg";
+			const r2Key = `devices/models/${model.slug}.${ext}`;
+			const existing = await db
+				.select({ id: modelImages.id })
+				.from(modelImages)
+				.where(eq(modelImages.modelId, model.id))
+				.all();
+			if (existing.length === 0) {
+				await db
+					.insert(modelImages)
+					.values({
+						modelId: model.id,
+						originalUrl: model.imageUrl,
+						r2Key,
+						isPrimary: 1,
+						position: 0,
+					})
+					.run();
+			}
+		} catch {
+			/* model_images insert is best-effort */
 		}
 	}
 
